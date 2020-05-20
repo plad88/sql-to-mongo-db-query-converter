@@ -306,11 +306,11 @@ public class SqlUtils {
     }
 
     public static List<String> getGroupByColumnReferences(PlainSelect plainSelect) {
-        if (plainSelect.getGroupBy()==null) {
+        if (plainSelect.getGroupByColumnReferences()==null) {
             return Collections.emptyList();
         }
 
-        return Lists.transform(plainSelect.getGroupBy().getGroupByExpressions(),
+        return Lists.transform(plainSelect.getGroupByColumnReferences(),
                 new com.google.common.base.Function<Expression, String>() {
             @Override
             public String apply(@Nonnull  Expression expression) {
