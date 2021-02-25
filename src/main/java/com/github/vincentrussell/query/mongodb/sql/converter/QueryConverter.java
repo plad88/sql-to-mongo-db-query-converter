@@ -239,7 +239,6 @@ public class QueryConverter {
         if (sqlCommandInfoHolder.isDistinct() && sqlCommandInfoHolder.getSelectItems().get(0) instanceof SelectExpressionItem) {
             //group by same al select items as string
             List<String> auxGroupBys = sqlCommandInfoHolder.getSelectItems().stream().map(selectItem -> ((SelectExpressionItem) selectItem).getExpression().toString()).collect(Collectors.toList());
-                    sqlCommandInfoHolder.getFromHolder();
             sqlCommandInfoHolder.setGoupBys(auxGroupBys);
         }
         if (sqlCommandInfoHolder.getGoupBys().size() > 0) {
