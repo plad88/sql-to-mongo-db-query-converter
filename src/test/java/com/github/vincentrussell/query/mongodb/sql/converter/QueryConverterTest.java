@@ -528,24 +528,24 @@ public class QueryConverterTest {
                 .sqlString("select t._id as id, t.Restaurant as R from Restaurants as t  where t._id = OID('5e97ae59c63d1b3ff8e07c74')").build();
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         queryConverter.write(byteArrayOutputStream);
-        assertEquals("db.Restaurants.aggregate([{\n" + 
-        		"  \"$match\": {\n" + 
-        		"    \"$expr\": {\n" + 
-        		"      \"$eq\": [\n" + 
-        		"        {\n" + 
-        		"          \"$toObjectId\": \"5e97ae59c63d1b3ff8e07c74\"\n" + 
-        		"        },\n" + 
-        		"        \"$_id\"\n" + 
-        		"      ]\n" + 
-        		"    }\n" + 
-        		"  }\n" + 
-        		"},{\n" + 
-        		"  \"$project\": {\n" + 
-        		"    \"_id\": 0,\n" + 
-        		"    \"id\": \"$_id\",\n" + 
-        		"    \"R\": \"$Restaurant\"\n" + 
-        		"  }\n" + 
-        		"}])",byteArrayOutputStream.toString("UTF-8"));
+        assertEquals("db.Restaurants.aggregate([{\n" +
+                "  \"$match\": {\n" +
+                "    \"$expr\": {\n" +
+                "      \"$eq\": [\n" +
+                "        \"$_id\",\n" +
+                "        {\n" +
+                "          \"$toObjectId\": \"5e97ae59c63d1b3ff8e07c74\"\n" +
+                "        }\n" +
+                "      ]\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"_id\": 0,\n" +
+                "    \"id\": \"$_id\",\n" +
+                "    \"R\": \"$Restaurant\"\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
     }
 
     @Test
@@ -2687,6 +2687,64 @@ public class QueryConverterTest {
         assertEquals(Arrays.asList("agent_code"),mongoDBQueryHolder.getGroupBys());
         assertEquals(document("count",document("$gt",1L)),mongoDBQueryHolder.getHaving());
         assertEquals(document("agent_code",document("$regex","^AW.{1}.*$")),mongoDBQueryHolder.getQuery());
+    }
+
+    @Test
+    public void testDateWhereRange() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("select t._id as id, t.ODEO_Report as ODEO_Report  from ODEO_Report as t where 1 = 1 \n" +
+                "AND t.ODEO_Report.creationDateTime>=TIMESTAMP('2021-02-03T23:00:00Z')\n" +
+                "AND t.ODEO_Report.creationDateTime<TIMESTAMP('2021-02-05T23:00:00Z')\n" +
+                "order by t.ODEO_Report.creationDateTime DESC LIMIT 10 OFFSET 0 ").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.ODEO_Report.aggregate([{\n" +
+                "  \"$match\": {\n" +
+                "    \"$and\": [\n" +
+                "      {\n" +
+                "        \"$expr\": {\n" +
+                "          \"$eq\": [\n" +
+                "            1,\n" +
+                "            1\n" +
+                "          ]\n" +
+                "        }\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"$expr\": {\n" +
+                "          \"$gte\": [\n" +
+                "            \"$ODEO_Report.creationDateTime\",\n" +
+                "            {\n" +
+                "              \"$toDate\": \"2021-02-03T23:00:00Z\"\n" +
+                "            }\n" +
+                "          ]\n" +
+                "        }\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"$expr\": {\n" +
+                "          \"$lt\": [\n" +
+                "            \"$ODEO_Report.creationDateTime\",\n" +
+                "            {\n" +
+                "              \"$toDate\": \"2021-02-05T23:00:00Z\"\n" +
+                "            }\n" +
+                "          ]\n" +
+                "        }\n" +
+                "      }\n" +
+                "    ]\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$sort\": {\n" +
+                "    \"ODEO_Report.creationDateTime\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$skip\": 0\n" +
+                "},{\n" +
+                "  \"$limit\": 10\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"_id\": 0,\n" +
+                "    \"id\": \"$_id\",\n" +
+                "    \"ODEO_Report\": \"$ODEO_Report\"\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
     }
 
     private static Document document(String key, Object... values) {

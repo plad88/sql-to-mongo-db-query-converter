@@ -50,9 +50,10 @@ public class WhereCauseProcessor {
         }
         else if (Function.class.isInstance(rightExpression)){
         	Document doc = new Document();
-        	Object leftParse = parseExpression(new Document(), rightExpression, leftExpression);
-        	Object rightParse = parseExpression(new Document(), leftExpression, rightExpression);
-        	doc.put(operator, Arrays.asList(leftParse, (SqlUtils.isColumn(leftExpression)&&!leftExpression.toString().startsWith("$")?"$" + rightParse:rightParse)));
+            Object leftParse = parseExpression(new Document(), leftExpression, rightExpression);
+            Object rightParse = parseExpression(new Document(), rightExpression, leftExpression);
+            doc.put(operator, Arrays.asList((SqlUtils.isColumn(leftExpression)
+                    && !leftExpression.toString().startsWith("$") ? "$" + leftParse : leftParse), rightParse));
         	query.put("$expr", doc); 
     	} else if (SqlUtils.isColumn(leftExpression)){
         	Document subdocument = new Document();
