@@ -227,24 +227,156 @@ public class QueryConverterTest {
         QueryConverter queryConverter = new QueryConverter.Builder().sqlString("select DISTINCT column1 from my_table where value=1").build();
         MongoDBQueryHolder mongoDBQueryHolder = queryConverter.getMongoQuery();
         assertEquals(1, mongoDBQueryHolder.getProjection().size());
-        assertEquals(document("column1",1),mongoDBQueryHolder.getProjection());
+        assertEquals(document("_id","$column1"),mongoDBQueryHolder.getProjection());
         assertEquals("my_table", mongoDBQueryHolder.getCollection());
         assertEquals(document("value", 1L), mongoDBQueryHolder.getQuery());
     }
 
     @Test
-    public void selectDistinctMultipleFields() throws ParseException {
+    public void selectDistinctAll() throws ParseException {
         expectedException.expect(ParseException.class);
-        expectedException.expectMessage(containsString("cannot run distinct one more than one column"));
-        new QueryConverter.Builder().sqlString("select DISTINCT column1, column2 from my_table where value=1").build();
+        expectedException.expectMessage(containsString("cannot have select * with distinct clause"));
+        new QueryConverter.Builder().sqlString("select DISTINCT * from my_table where value=1").build();
+    }
+    @Test
+    public void writeWithoutDistinctNestedProjection() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("select distinct Restaurant.borough from Restaurants where Restaurant.cuisine = 'Chinese'").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.Restaurants.aggregate([{\n" +
+                "  \"$match\": {\n" +
+                "    \"Restaurant.cuisine\": \"Chinese\"\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": \"$Restaurant.borough\"\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"Restaurant.borough\": \"$_id\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
     }
 
     @Test
-    public void selectDistinctAll() throws ParseException {
-        expectedException.expect(ParseException.class);
-        expectedException.expectMessage(containsString("cannot run distinct one more than one column"));
-        new QueryConverter.Builder().sqlString("select DISTINCT * from my_table where value=1").build();
+    public void writeWithoutDistinctNestedMultiProjection() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("select distinct Restaurant.cuisine, Restaurant.borough from Restaurants").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.Restaurants.aggregate([{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": {\n" +
+                "      \"Restaurant_cuisine\": \"$Restaurant.cuisine\",\n" +
+                "      \"Restaurant_borough\": \"$Restaurant.borough\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"Restaurant.cuisine\": \"$_id.Restaurant_cuisine\",\n" +
+                "    \"Restaurant.borough\": \"$_id.Restaurant_borough\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
     }
+
+    @Test
+    public void writeWithoutDistinctNestedMultiProjectionOrderBy() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("select distinct Restaurant.cuisine, Restaurant.borough from Restaurants order by Restaurant.cuisine desc, Restaurant.borough desc").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.Restaurants.aggregate([{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": {\n" +
+                "      \"Restaurant_cuisine\": \"$Restaurant.cuisine\",\n" +
+                "      \"Restaurant_borough\": \"$Restaurant.borough\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$sort\": {\n" +
+                "    \"_id.Restaurant_cuisine\": -1,\n" +
+                "    \"_id.Restaurant_borough\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"Restaurant.cuisine\": \"$_id.Restaurant_cuisine\",\n" +
+                "    \"Restaurant.borough\": \"$_id.Restaurant_borough\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
+    }
+
+    @Test
+    public void writeWithoutDistinctNestedSubquery() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("select count(*) from (select distinct Restaurant.borough from Restaurants where Restaurant.cuisine = 'Chinese')").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.Restaurants.aggregate([{\n" +
+                "  \"$match\": {\n" +
+                "    \"Restaurant.cuisine\": \"Chinese\"\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": \"$Restaurant.borough\"\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"Restaurant.borough\": \"$_id\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": {},\n" +
+                "    \"count\": {\n" +
+                "      \"$sum\": 1\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"count\": 1,\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
+    }
+
+    @Test
+    public void writeWithoutDistinctNestedSubqueryMultiProjectOrderBy() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("select count(*) from (select distinct Restaurant.cuisine, Restaurant.borough from Restaurants order by Restaurant.cuisine desc, Restaurant.borough desc)").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.Restaurants.aggregate([{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": {\n" +
+                "      \"Restaurant_cuisine\": \"$Restaurant.cuisine\",\n" +
+                "      \"Restaurant_borough\": \"$Restaurant.borough\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$sort\": {\n" +
+                "    \"_id.Restaurant_cuisine\": -1,\n" +
+                "    \"_id.Restaurant_borough\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"Restaurant.cuisine\": \"$_id.Restaurant_cuisine\",\n" +
+                "    \"Restaurant.borough\": \"$_id.Restaurant_borough\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": {},\n" +
+                "    \"count\": {\n" +
+                "      \"$sum\": 1\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"count\": 1,\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
+    }
+
 
     @Test
     public void selectAllFromTableWithSimpleWhereClauseLongNotNull() throws ParseException {
@@ -1050,11 +1182,22 @@ public class QueryConverterTest {
         QueryConverter queryConverter = new QueryConverter.Builder().sqlString("select distinct column1 from my_table where value IS NULL").build();
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         queryConverter.write(byteArrayOutputStream);
-        assertEquals("db.my_table.distinct(\"column1\" , {\n" +
-                "  \"value\": {\n" +
-                "    \"$exists\": false\n" +
+        assertEquals("db.my_table.aggregate([{\n" +
+                "  \"$match\": {\n" +
+                "    \"value\": {\n" +
+                "      \"$exists\": false\n" +
+                "    }\n" +
                 "  }\n" +
-                "})",byteArrayOutputStream.toString("UTF-8"));
+                "},{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": \"$column1\"\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"column1\": \"$_id\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
     }
 
     @Test

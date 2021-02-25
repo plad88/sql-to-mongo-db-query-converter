@@ -283,14 +283,23 @@ public class QueryConverterIT {
     }
 
     @Test
-    public void distinctQuery() throws ParseException {
+    public void distinctQuery() throws ParseException, IOException, JSONException {
         QueryConverter queryConverter = new QueryConverter.Builder()
-                .sqlString("select distinct borough from "+COLLECTION+" where address.street LIKE '%Street'").build();
-        QueryResultIterator<String> distinctIterable = queryConverter.run(mongoDatabase);
-        List<String> results = Lists.newArrayList(distinctIterable);
+                .sqlString("select distinct borough from "+COLLECTION+" where address.street LIKE '%Street' order by borough").build();
+        QueryResultIterator<Document> distinctIterable = queryConverter.run(mongoDatabase);
+        List<Document> results = Lists.newArrayList(distinctIterable);
         assertEquals(5, results.size());
-        Collections.sort(results);
-        assertEquals(Arrays.asList("Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"),results);
+        JSONAssert.assertEquals("[{\n" +
+                "	\"borough\" : \"Bronx\"\n" +
+                "},{\n" +
+                "	\"borough\" : \"Brooklyn\"\n" +
+                "},{\n" +
+                "	\"borough\" : \"Manhattan\"\n" +
+                "},{\n" +
+                "	\"borough\" : \"Queens\"\n" +
+                "},{\n" +
+                "	\"borough\" : \"Staten Island\"\n" +
+                "}]",toJson(results),false);
     }
     
     @Test

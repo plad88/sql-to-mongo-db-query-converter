@@ -29,7 +29,7 @@ public class SQLCommandInfoHolder implements SQLInfoHolder{
     private final Expression whereClause;
     private final List<SelectItem> selectItems;
     private final List<Join> joins;
-    private final List<String> groupBys;
+    private List<String> groupBys;
     private final List<OrderByElement> orderByElements;
     private final AliasHolder aliasHolder;
     private final Expression havingClause;
@@ -98,6 +98,10 @@ public class SQLCommandInfoHolder implements SQLInfoHolder{
 
     public List<String> getGoupBys() {
         return groupBys;
+    }
+
+    public void setGoupBys(List<String> groupBys) {
+        this.groupBys = groupBys;
     }
     
     public Expression getHavingClause() {

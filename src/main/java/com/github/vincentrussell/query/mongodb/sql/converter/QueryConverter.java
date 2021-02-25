@@ -45,6 +45,7 @@ import javax.annotation.Nonnull;
 import java.io.*;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import static org.apache.commons.lang.StringUtils.isEmpty;
 import static org.apache.commons.lang.Validate.notNull;
@@ -200,11 +201,15 @@ public class QueryConverter {
             }
         }));
 
-        SqlUtils.isFalse((selectItems.size() >1
-                || SqlUtils.isSelectAll(selectItems))
-                && sqlCommandInfoHolder.isDistinct(),"cannot run distinct one more than one column");
-        SqlUtils.isFalse(sqlCommandInfoHolder.getGoupBys().size() == 0 && selectItems.size()!=filteredItems.size() && !SqlUtils.isSelectAll(selectItems)
-                && !SqlUtils.isCountAll(selectItems)&& !sqlCommandInfoHolder.isTotalGroup(),"illegal expression(s) found in select clause.  Only column names supported");
+        SqlUtils.isFalse((selectItems.size() > 1
+                && SqlUtils.isSelectAll(selectItems)), "cannot run select * with more fields");
+        SqlUtils.isFalse((sqlCommandInfoHolder.isDistinct()
+                && SqlUtils.isSelectAll(selectItems)), "cannot have select * with distinct clause");
+        SqlUtils.isFalse(sqlCommandInfoHolder.getGoupBys().size() == 0
+                        && selectItems.size() != filteredItems.size() && !SqlUtils.isSelectAll(selectItems)
+                        && !SqlUtils.isCountAll(selectItems)
+                        && !sqlCommandInfoHolder.isTotalGroup(),
+                "illegal expression(s) found in select clause. ");
     }
 
     /**
@@ -225,16 +230,19 @@ public class QueryConverter {
     private MongoDBQueryHolder getMongoQueryInternal(SQLCommandInfoHolder sqlCommandInfoHolder) throws ParseException, net.sf.jsqlparser.parser.ParseException {
         MongoDBQueryHolder mongoDBQueryHolder = new MongoDBQueryHolder(sqlCommandInfoHolder.getBaseTableName(), sqlCommandInfoHolder.getSqlCommandType());
     	Document document = new Document();
+
         //From Subquery 
         if(sqlCommandInfoHolder.getFromHolder().getBaseFrom().getClass() == SubSelect.class) {
         	mongoDBQueryHolder.setPrevSteps(fromSQLCommandInfoHolderToAggregateSteps((SQLCommandInfoHolder)sqlCommandInfoHolder.getFromHolder().getBaseSQLHolder()));
         }
-        
-        if (sqlCommandInfoHolder.isDistinct()) {
-            document.put(sqlCommandInfoHolder.getSelectItems().get(0).toString(), 1);
-            mongoDBQueryHolder.setProjection(document);
-            mongoDBQueryHolder.setDistinct(sqlCommandInfoHolder.isDistinct());
-        } else if (sqlCommandInfoHolder.getGoupBys().size() > 0) {
+
+        if (sqlCommandInfoHolder.isDistinct() && sqlCommandInfoHolder.getSelectItems().get(0) instanceof SelectExpressionItem) {
+            //group by same al select items as string
+            List<String> auxGroupBys = sqlCommandInfoHolder.getSelectItems().stream().map(selectItem -> ((SelectExpressionItem) selectItem).getExpression().toString()).collect(Collectors.toList());
+                    sqlCommandInfoHolder.getFromHolder();
+            sqlCommandInfoHolder.setGoupBys(auxGroupBys);
+        }
+        if (sqlCommandInfoHolder.getGoupBys().size() > 0) {
         	List<String> groupBys = preprocessGroupBy(sqlCommandInfoHolder.getGoupBys(),sqlCommandInfoHolder.getFromHolder());
         	List<SelectItem> selects = preprocessSelect(sqlCommandInfoHolder.getSelectItems(),sqlCommandInfoHolder.getFromHolder());
         	if(sqlCommandInfoHolder.getGoupBys().size() > 0) {
