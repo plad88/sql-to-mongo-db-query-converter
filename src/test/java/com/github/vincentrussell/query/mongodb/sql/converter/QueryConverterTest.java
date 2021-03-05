@@ -377,6 +377,113 @@ public class QueryConverterTest {
                 "}])",byteArrayOutputStream.toString("UTF-8"));
     }
 
+    @Test
+    public void writeDistinctOrderByAnotherField() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("SELECT distinct billingCycle as dimension FROM OUIC_OT_CommercialCycleAggregatedDaily AS c order by c.yearMonthDay desc").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.OUIC_OT_CommercialCycleAggregatedDaily.aggregate([{\n" +
+                "  \"$sort\": {\n" +
+                "    \"yearMonthDay\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": \"$billingCycle\",\n" +
+                "    \"yearMonthDay\": {\n" +
+                "      \"$first\": \"$yearMonthDay\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$sort\": {\n" +
+                "    \"yearMonthDay\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"dimension\": \"$_id\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
+    }
+
+    @Test
+    public void writeDistinctTwoFieldsOrderByAnotherField() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("SELECT distinct billingCycle as dimension, yearMonth as name FROM OUIC_OT_CommercialCycleAggregatedDaily AS c order by c.yearMonthDay desc").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.OUIC_OT_CommercialCycleAggregatedDaily.aggregate([{\n" +
+                "  \"$sort\": {\n" +
+                "    \"yearMonthDay\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": {\n" +
+                "      \"billingCycle\": \"$billingCycle\",\n" +
+                "      \"yearMonth\": \"$yearMonth\"\n" +
+                "    },\n" +
+                "    \"yearMonthDay\": {\n" +
+                "      \"$first\": \"$yearMonthDay\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$sort\": {\n" +
+                "    \"yearMonthDay\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"dimension\": \"$_id.billingCycle\",\n" +
+                "    \"name\": \"$_id.yearMonth\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
+    }
+
+    @Test
+    public void writeDistinctTwoFieldsSameColumn() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("SELECT distinct billingCycle as dimension, billingCycle as name FROM OUIC_OT_CommercialCycleAggregatedDaily AS c").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.OUIC_OT_CommercialCycleAggregatedDaily.aggregate([{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": \"$billingCycle\"\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"dimension\": \"$_id\",\n" +
+                "    \"name\": \"$_id\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
+    }
+
+    @Test
+    public void writeDistinctTwoFieldsSameColumnOrderByAnotherField() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder().sqlString("SELECT distinct billingCycle as dimension, billingCycle as name FROM OUIC_OT_CommercialCycleAggregatedDaily AS c order by c.yearMonthDay desc").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.OUIC_OT_CommercialCycleAggregatedDaily.aggregate([{\n" +
+                "  \"$sort\": {\n" +
+                "    \"yearMonthDay\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$group\": {\n" +
+                "    \"_id\": \"$billingCycle\",\n" +
+                "    \"yearMonthDay\": {\n" +
+                "      \"$first\": \"$yearMonthDay\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$sort\": {\n" +
+                "    \"yearMonthDay\": -1\n" +
+                "  }\n" +
+                "},{\n" +
+                "  \"$project\": {\n" +
+                "    \"dimension\": \"$_id\",\n" +
+                "    \"name\": \"$_id\",\n" +
+                "    \"_id\": 0\n" +
+                "  }\n" +
+                "}])",byteArrayOutputStream.toString("UTF-8"));
+    }
+
 
     @Test
     public void selectAllFromTableWithSimpleWhereClauseLongNotNull() throws ParseException {

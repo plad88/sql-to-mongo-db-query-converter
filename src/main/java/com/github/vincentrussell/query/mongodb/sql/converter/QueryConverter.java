@@ -287,7 +287,7 @@ public class QueryConverter {
         }
 
         if (sqlCommandInfoHolder.getOrderByElements()!=null && sqlCommandInfoHolder.getOrderByElements().size() > 0) {
-            mongoDBQueryHolder.setSort(createSortInfoFromOrderByElements(preprocessOrderBy(sqlCommandInfoHolder.getOrderByElements(),sqlCommandInfoHolder.getFromHolder()),sqlCommandInfoHolder.getAliasHolder(),sqlCommandInfoHolder.getGoupBys()));
+            mongoDBQueryHolder.setSort(createSortInfoFromOrderByElements(preprocessOrderBy(sqlCommandInfoHolder.getOrderByElements(),sqlCommandInfoHolder.getFromHolder()),sqlCommandInfoHolder.getAliasHolder(),sqlCommandInfoHolder.getGoupBys(), mongoDBQueryHolder, sqlCommandInfoHolder.getSelectItems()));
         }
 
         if (sqlCommandInfoHolder.getWhereClause()!=null) {
@@ -379,7 +379,7 @@ public class QueryConverter {
     	return lgroupEraseAlias;
     }
 
-    private Document createSortInfoFromOrderByElements(@Nonnull List<OrderByElement> orderByElements, AliasHolder aliasHolder, List<String> groupBys) throws ParseException {
+    private Document createSortInfoFromOrderByElements(@Nonnull List<OrderByElement> orderByElements, AliasHolder aliasHolder, List<String> groupBys, MongoDBQueryHolder mongoDBQueryHolder, List<SelectItem> lsel) throws ParseException {
         if (orderByElements.size()==0) {
             return new Document();
         }
@@ -407,41 +407,58 @@ public class QueryConverter {
 
         Document sortItems = new Document();
         for (OrderByElement orderByElement : orderByElements) {
-            if (nonFunctionItems.contains(orderByElement)) {
-            	String sortField = SqlUtils.getStringValue(orderByElement.getExpression());
-            	String projectField = aliasHolder.getFieldFromAliasOrField(sortField);
-            	if(!groupBys.isEmpty()) {
-            		
-            		if(!SqlUtils.isAggregateExp(projectField)) {
-	            		if(groupBys.size() > 1) {
-	            			projectField = "_id." + projectField.replaceAll("\\.", "_");
-	            		}
-	            		else {
-	            			projectField = "_id";
-	            		}
-            		}
-            		else {
-            			projectField = sortField;
-            		}
-            	}
-                sortItems.put(projectField, orderByElement.isAsc() ? 1 : -1);
+            if(!groupBys.isEmpty() && !containsSelectOrderBy(orderByElement.getExpression(),lsel)) {
+                String sortKey = orderByElement.getExpression().toString().replaceAll("\\.", "_");
+                mongoDBQueryHolder.getSortPreGroup().put(sortKey, orderByElement.isAsc() ? 1 : -1);
+                Document firstInGroup = new Document();
+                firstInGroup.put("$first", "$" + sortKey);
+                mongoDBQueryHolder.getProjection().put(sortKey, firstInGroup);
+                sortItems.put(sortKey, orderByElement.isAsc() ? 1 : -1);
             } else {
-                Function function = (Function) orderByElement.getExpression();
-                String sortKey;
-                String alias = aliasHolder.getAliasFromFieldExp(function.toString());
-                if(alias!=null && !alias.equals(function.toString())) {
-                	sortKey = alias;
+                if (nonFunctionItems.contains(orderByElement)) {
+                    String sortField = SqlUtils.getStringValue(orderByElement.getExpression());
+                    String projectField = aliasHolder.getFieldFromAliasOrField(sortField);
+                    if (!groupBys.isEmpty()) {
+
+                        if (!SqlUtils.isAggregateExp(projectField)) {
+                            if (groupBys.size() > 1) {
+                                projectField = "_id." + projectField.replaceAll("\\.", "_");
+                            } else {
+                                projectField = "_id";
+                            }
+                        } else {
+                            projectField = sortField;
+                        }
+                    }
+                    sortItems.put(projectField, orderByElement.isAsc() ? 1 : -1);
+                } else {
+                    Function function = (Function) orderByElement.getExpression();
+                    String sortKey;
+                    String alias = aliasHolder.getAliasFromFieldExp(function.toString());
+                    if (alias != null && !alias.equals(function.toString())) {
+                        sortKey = alias;
+                    } else {
+                        Document parseFunctionDocument = new Document();
+                        parseFunctionForAggregation(function, parseFunctionDocument, Collections.<String>emptyList(), null);
+                        sortKey = Iterables.get(parseFunctionDocument.keySet(), 0);
+                    }
+                    sortItems.put(sortKey, orderByElement.isAsc() ? 1 : -1);
                 }
-                else {
-	                Document parseFunctionDocument = new Document();
-	                parseFunctionForAggregation(function,parseFunctionDocument,Collections.<String>emptyList(),null);
-	                sortKey = Iterables.get(parseFunctionDocument.keySet(),0);
-                }
-                sortItems.put(sortKey,orderByElement.isAsc() ? 1 : -1);
             }
         }
 
         return sortItems;
+    }
+
+    private boolean containsSelectOrderBy(Expression orderbyexp, List<SelectItem> lsel) {
+        String orderby = orderbyexp.toString();
+        for (SelectItem sel: lsel) {
+            SelectExpressionItem selectExpItem = (SelectExpressionItem) sel;
+            if (orderby.equals(selectExpItem.getExpression().toString()) || (selectExpItem.getAlias() != null && orderby.equals(selectExpItem.getAlias().getName()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Document createProjectionsFromSelectItems(@Nonnull List<SelectItem> selectItems, List<String> groupBys) throws ParseException {
@@ -526,13 +543,25 @@ public class QueryConverter {
         	document.put(nameOrAlias, "$_id");
         }
         else {
+            //check group only one field multiple aliases
+            boolean checkSameField = false;
+            if(nonFunctionItems != null && nonFunctionItems.size() > 0) {
+                checkSameField = true;
+                String fieldBase = ((SelectExpressionItem) nonFunctionItems.get(0)).getExpression().toString();
+                for (SelectItem selectItem : nonFunctionItems) {
+                    if (!fieldBase.equals(((SelectExpressionItem) selectItem).getExpression().toString())) {
+                        checkSameField = false;
+                        break;
+                    }
+                }
+            }
 	        for (SelectItem selectItem : nonFunctionItems) {
 	        	SelectExpressionItem selectExpressionItem =  ((SelectExpressionItem) selectItem);
 	        	Column column = (Column) selectExpressionItem.getExpression();
 	            String columnName = SqlUtils.getStringValue(column);
 	            Alias alias = selectExpressionItem.getAlias();
 	            String nameOrAlias = (alias != null ? alias.getName() : columnName);
-	        	document.put(nameOrAlias, "$_id." + columnName.replaceAll("\\.","_"));
+	        	document.put(nameOrAlias, (checkSameField?"$_id":"$_id." + columnName.replaceAll("\\.","_")));
 	        }
         }
         
@@ -734,6 +763,10 @@ public class QueryConverter {
         if(sqlCommandInfoHolder.getJoins() != null && !sqlCommandInfoHolder.getJoins().isEmpty()) {
         	documents.addAll(mongoDBQueryHolder.getJoinPipeline());
         }
+        if (mongoDBQueryHolder.getSortPreGroup() != null && mongoDBQueryHolder.getSortPreGroup().size() > 0) {
+            documents.add(new Document("$sort", mongoDBQueryHolder.getSortPreGroup()));
+        }
+
         if(!sqlCommandInfoHolder.getGoupBys().isEmpty() || sqlCommandInfoHolder.isTotalGroup()) {
         	if(mongoDBQueryHolder.getProjection().get("_id") == null ) {//Generate _id with empty document
         		Document dgroup = new Document();

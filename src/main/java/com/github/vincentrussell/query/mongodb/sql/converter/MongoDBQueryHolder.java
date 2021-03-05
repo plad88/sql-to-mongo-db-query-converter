@@ -14,6 +14,7 @@ public class MongoDBQueryHolder {
     private Document query = new Document();
     private Document projection = new Document();
     private Document sort = new Document();
+    private Document sortPreGroup = new Document();
     private Document aliasProjection = new Document();
     private List<Document> joinPipeline = new ArrayList<Document>();
     private boolean distinct = false;
@@ -80,6 +81,14 @@ public class MongoDBQueryHolder {
     public void setSort(Document sort) {
         notNull(sort, "sort is null");
         this.sort = sort;
+    }
+
+    public Document getSortPreGroup() {
+        return sortPreGroup;
+    }
+
+    public void setSortPreGroup(Document sortPreGroup) {
+        this.sortPreGroup = sortPreGroup;
     }
 
     public void setDistinct(boolean distinct) {
