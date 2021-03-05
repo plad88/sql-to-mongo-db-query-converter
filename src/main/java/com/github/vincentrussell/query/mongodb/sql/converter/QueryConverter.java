@@ -545,7 +545,7 @@ public class QueryConverter {
         else {
             //check group only one field multiple aliases
             boolean checkSameField = false;
-            if(nonFunctionItems != null && nonFunctionItems.size() > 0) {
+            if(nonFunctionItems.size() > 0) {
                 checkSameField = true;
                 String fieldBase = ((SelectExpressionItem) nonFunctionItems.get(0)).getExpression().toString();
                 for (SelectItem selectItem : nonFunctionItems) {
