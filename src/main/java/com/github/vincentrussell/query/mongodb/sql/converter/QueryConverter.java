@@ -408,10 +408,12 @@ public class QueryConverter {
         Document sortItems = new Document();
         for (OrderByElement orderByElement : orderByElements) {
             if(!groupBys.isEmpty() && !containsSelectOrderBy(orderByElement.getExpression(),lsel)) {
-                String sortKey = orderByElement.getExpression().toString().replaceAll("\\.", "_");
-                mongoDBQueryHolder.getSortPreGroup().put(sortKey, orderByElement.isAsc() ? 1 : -1);
+                String field =  orderByElement.getExpression().toString();
+                String sortKey = field.replaceAll("\\.", "_");
+
+                mongoDBQueryHolder.getSortPreGroup().put(field, orderByElement.isAsc() ? 1 : -1);
                 Document firstInGroup = new Document();
-                firstInGroup.put("$first", "$" + sortKey);
+                firstInGroup.put("$first", "$" + field);
                 mongoDBQueryHolder.getProjection().put(sortKey, firstInGroup);
                 sortItems.put(sortKey, orderByElement.isAsc() ? 1 : -1);
             } else {
