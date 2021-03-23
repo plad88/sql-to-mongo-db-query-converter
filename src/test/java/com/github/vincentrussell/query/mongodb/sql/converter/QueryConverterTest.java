@@ -877,6 +877,46 @@ public class QueryConverterTest {
         		"  }\n" + 
         		"}])",byteArrayOutputStream.toString("UTF-8"));
     }
+
+    @Test
+    public void InTestFind() throws ParseException, IOException {
+        QueryConverter queryConverter = new QueryConverter.Builder()
+                .sqlString("SELECT count(id) FROM OUIC_OT_ReadingsDetail WHERE territorialAreaLevel1 IN ('SUDAMERICA') AND territorialAreaLevel2 IN ('URUGUAY') AND rcOrganizationalAreaLevel1 IN ('Onesait Utilities Customers') AND buOrganizationalAreaLevel1 IN ('Onesait Utilities Customers')").build();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        queryConverter.write(byteArrayOutputStream);
+        assertEquals("db.OUIC_OT_ReadingsDetail.count({\n" +
+                "  \"$and\": [\n" +
+                "    {\n" +
+                "      \"territorialAreaLevel1\": {\n" +
+                "        \"$in\": [\n" +
+                "          \"SUDAMERICA\"\n" +
+                "        ]\n" +
+                "      }\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"territorialAreaLevel2\": {\n" +
+                "        \"$in\": [\n" +
+                "          \"URUGUAY\"\n" +
+                "        ]\n" +
+                "      }\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"rcOrganizationalAreaLevel1\": {\n" +
+                "        \"$in\": [\n" +
+                "          \"Onesait Utilities Customers\"\n" +
+                "        ]\n" +
+                "      }\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"buOrganizationalAreaLevel1\": {\n" +
+                "        \"$in\": [\n" +
+                "          \"Onesait Utilities Customers\"\n" +
+                "        ]\n" +
+                "      }\n" +
+                "    }\n" +
+                "  ]\n" +
+                "})",byteArrayOutputStream.toString("UTF-8"));
+    }
     
     @Test
     public void objectIdFunctionNotInTest() throws ParseException {
@@ -1137,7 +1177,7 @@ public class QueryConverterTest {
     public void deleteQueryMoreComplicated() throws ParseException {
         QueryConverter queryConverter = new QueryConverter.Builder().sqlString("delete from table where value IN (\"theValue1\",\"theValue2\",\"theValue3\")").build();
         MongoDBQueryHolder mongoDBQueryHolder = queryConverter.getMongoQuery();
-        assertEquals(document("$expr",documentValuesArray("$in","$value",objsToList("theValue1","theValue2","theValue3"))),mongoDBQueryHolder.getQuery());
+        assertEquals(document("value",documentValuesArray("$in","theValue1","theValue2","theValue3")),mongoDBQueryHolder.getQuery());
         assertEquals(SQLCommandType.DELETE, mongoDBQueryHolder.getSqlCommandType());
     }
     
@@ -1146,18 +1186,15 @@ public class QueryConverterTest {
         QueryConverter queryConverter = new QueryConverter.Builder().sqlString("delete from Restaurants where Restaurant.cuisine IN ('American ','Italian','Chinese')").build();
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         queryConverter.write(byteArrayOutputStream);
-        assertEquals("db.Restaurants.remove({\n" + 
-        		"  \"$expr\": {\n" + 
-        		"    \"$in\": [\n" + 
-        		"      \"$Restaurant.cuisine\",\n" + 
-        		"      [\n" + 
-        		"        \"American \",\n" + 
-        		"        \"Italian\",\n" + 
-        		"        \"Chinese\"\n" + 
-        		"      ]\n" + 
-        		"    ]\n" + 
-        		"  }\n" + 
-        		"})",byteArrayOutputStream.toString("UTF-8"));
+        assertEquals("db.Restaurants.remove({\n" +
+                "  \"Restaurant.cuisine\": {\n" +
+                "    \"$in\": [\n" +
+                "      \"American \",\n" +
+                "      \"Italian\",\n" +
+                "      \"Chinese\"\n" +
+                "    ]\n" +
+                "  }\n" +
+                "})",byteArrayOutputStream.toString("UTF-8"));
     }
 
     @Test
@@ -1182,7 +1219,7 @@ public class QueryConverterTest {
         assertEquals(2,mongoDBQueryHolder.getProjection().size());
         assertEquals("my_table",mongoDBQueryHolder.getCollection());
         assertEquals(document("_id",0).append("column1",1),mongoDBQueryHolder.getProjection());
-        assertEquals(document("$expr",documentValuesArray("$in","$value",objsToList("theValue1","theValue2","theValue3"))),mongoDBQueryHolder.getQuery());
+        assertEquals(document("value",documentValuesArray("$in","theValue1","theValue2","theValue3")),mongoDBQueryHolder.getQuery());
     }
 
     @Test
@@ -1192,7 +1229,7 @@ public class QueryConverterTest {
         assertEquals(2,mongoDBQueryHolder.getProjection().size());
         assertEquals("my_table",mongoDBQueryHolder.getCollection());
         assertEquals(document("_id",0).append("column1",1),mongoDBQueryHolder.getProjection());
-        assertEquals(document("$expr",documentValuesArray("$nin","$value",objsToList("theValue1","theValue2","theValue3"))),mongoDBQueryHolder.getQuery());
+        assertEquals(document("value",documentValuesArray("$nin","theValue1","theValue2","theValue3")),mongoDBQueryHolder.getQuery());
     }
 
     @Test

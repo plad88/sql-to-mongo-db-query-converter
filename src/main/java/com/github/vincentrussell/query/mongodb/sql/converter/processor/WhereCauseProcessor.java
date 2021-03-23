@@ -17,10 +17,7 @@ import net.sf.jsqlparser.schema.Column;
 import org.bson.BsonArray;
 import org.bson.Document;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class WhereCauseProcessor {
 
@@ -134,7 +131,7 @@ public class WhereCauseProcessor {
             query.put(SqlUtils.getStringValue(isNullExpression.getLeftExpression()),new Document("$exists",isNullExpression.isNot()));
         } else if(InExpression.class.isInstance(incomingExpression)) {
             final InExpression inExpression = (InExpression) incomingExpression;
-            final Expression leftExpression = ((InExpression) incomingExpression).getLeftExpression();
+            final Expression leftExpression = inExpression.getLeftExpression();
             final String leftExpressionAsString = SqlUtils.getStringValue(leftExpression);
             ObjectIdFunction objectIdFunction = SqlUtils.isObjectIdFunction(this, incomingExpression);
 
@@ -153,17 +150,21 @@ public class WhereCauseProcessor {
                                 }
                             }
                         });
-
-                if (Function.class.isInstance(leftExpression)) {
-                    String mongoInFunction = inExpression.isNot() ? "$fnin" : "$fin";
-                    query.put(mongoInFunction, new Document("function", parseExpression(new Document(), leftExpression, otherSide)).append("list", objectList));
+                Optional<Object> result = objectList.stream().filter(obj -> Document.class.isInstance(obj)).findAny();
+                String mongoInFunction = inExpression.isNot() ? "$nin" : "$in";
+                Document doc = new Document();
+                if (Column.class.isInstance(leftExpression) && !result.isPresent()) {
+                    doc.put(mongoInFunction, objectList);
+                    query.put(((Column)leftExpression).getFullyQualifiedName(), doc);
                 } else {
-                    String mongoInFunction = inExpression.isNot() ? "$nin" : "$in";
-                    Document doc = new Document();
-                    List<Object> lobj = Arrays.asList(SqlUtils.nonFunctionToNode(leftExpression),(Object)objectList);
-                	doc.put(mongoInFunction, lobj);
-                	query.put("$expr", doc);
-
+                    if (Function.class.isInstance(leftExpression)) {
+                        mongoInFunction = inExpression.isNot() ? "$fnin" : "$fin";
+                        query.put(mongoInFunction, new Document("function", parseExpression(new Document(), leftExpression, otherSide)).append("list", objectList));
+                    } else {
+                        List<Object> lobj = Arrays.asList(SqlUtils.nonFunctionToNode(leftExpression), (Object) objectList);
+                        doc.put(mongoInFunction, lobj);
+                        query.put("$expr", doc);
+                    }
                 }
             }
         } else if(AndExpression.class.isInstance(incomingExpression)) {

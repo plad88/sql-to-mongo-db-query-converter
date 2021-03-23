@@ -191,7 +191,7 @@ public class SqlUtils {
                     && Function.class.isInstance(((SelectExpressionItem)firstItem).getExpression())) {
                 Function function = (Function) ((SelectExpressionItem) firstItem).getExpression();
 
-                if ("count(*)".equals(function.toString())) {
+                if ("count".equals(function.getName())) {
                     return true;
                 }
 
